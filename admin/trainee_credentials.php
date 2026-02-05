@@ -148,8 +148,8 @@ if ($result === false) {
                                                     <code class="bg-light px-2 py-1 rounded">
                                                         <?php echo htmlspecialchars($row['temp_username']); ?>
                                                     </code>
-                                                    <button class="btn btn-sm btn-outline-secondary" 
-                                                            onclick="copyToClipboard('<?php echo htmlspecialchars($row['temp_username']); ?>', this)"
+                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                            data-copy-text="<?php echo htmlspecialchars($row['temp_username']); ?>"
                                                             title="Copy username">
                                                         <i class="bi bi-clipboard"></i>
                                                     </button>
@@ -160,8 +160,8 @@ if ($result === false) {
                                                     <code class="bg-warning bg-opacity-10 px-2 py-1 rounded text-dark">
                                                         <?php echo htmlspecialchars($row['temp_password']); ?>
                                                     </code>
-                                                    <button class="btn btn-sm btn-outline-secondary" 
-                                                            onclick="copyToClipboard('<?php echo htmlspecialchars($row['temp_password']); ?>', this)"
+                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                            data-copy-text="<?php echo htmlspecialchars($row['temp_password']); ?>"
                                                             title="Copy password">
                                                         <i class="bi bi-clipboard"></i>
                                                     </button>
@@ -215,24 +215,6 @@ if ($result === false) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/main.js"></script>
-    <script>
-        function copyToClipboard(text, button) {
-            navigator.clipboard.writeText(text).then(function() {
-                // Show success feedback
-                const originalHTML = button.innerHTML;
-                button.innerHTML = '<i class="bi bi-check"></i>';
-                button.classList.add('btn-success');
-                button.classList.remove('btn-outline-secondary');
-                
-                setTimeout(function() {
-                    button.innerHTML = originalHTML;
-                    button.classList.remove('btn-success');
-                    button.classList.add('btn-outline-secondary');
-                }, 2000);
-            }).catch(function(err) {
-                alert('Failed to copy: ' + err);
-            });
-        }
-    </script>
+    <script src="../assets/js/copy-credentials.js"></script>
 </body>
 </html>

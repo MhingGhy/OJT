@@ -180,7 +180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = 'Please correct the errors below and try again.';
         }
-    }
+    } // Close the CSRF else block
+}
 
 $page_title = 'Add New Trainee';
 ?>
@@ -246,7 +247,7 @@ $page_title = 'Add New Trainee';
                                     <label class="form-label text-muted small">Username</label>
                                     <div class="input-group">
                                         <input type="text" class="form-control" id="temp-username" value="<?php echo htmlspecialchars($generated_credentials['username']); ?>" readonly>
-                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('temp-username')">
+                                        <button class="btn btn-outline-secondary copy-input-btn" type="button" data-target-id="temp-username">
                                             <i class="bi bi-clipboard"></i>
                                         </button>
                                     </div>
@@ -255,7 +256,7 @@ $page_title = 'Add New Trainee';
                                     <label class="form-label text-muted small">Temporary Password</label>
                                     <div class="input-group">
                                         <input type="text" class="form-control" id="temp-password" value="<?php echo htmlspecialchars($generated_credentials['password']); ?>" readonly>
-                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('temp-password')">
+                                        <button class="btn btn-outline-secondary copy-input-btn" type="button" data-target-id="temp-password">
                                             <i class="bi bi-clipboard"></i>
                                         </button>
                                     </div>
@@ -419,57 +420,6 @@ $page_title = 'Add New Trainee';
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/main.js"></script>
-    <script>
-        function copyToClipboard(elementId) {
-            const input = document.getElementById(elementId);
-            input.select();
-            input.setSelectionRange(0, 99999); // For mobile devices
-            
-            navigator.clipboard.writeText(input.value).then(function() {
-                // Show success feedback
-                const button = input.nextElementSibling;
-                const originalHTML = button.innerHTML;
-                button.innerHTML = '<i class="bi bi-check"></i>';
-                button.classList.add('btn-success');
-                button.classList.remove('btn-outline-secondary');
-                
-                setTimeout(function() {
-                    button.innerHTML = originalHTML;
-                    button.classList.remove('btn-success');
-                    button.classList.add('btn-outline-secondary');
-                }, 2000);
-            }).catch(function(err) {
-                alert('Failed to copy: ' + err);
-            });
-        }
-
-        // Handle form submission to prevent button stuck state
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('addTraineeForm');
-            const submitButton = form.querySelector('button[type="submit"]');
-            
-            if (form && submitButton) {
-                form.addEventListener('submit', function(e) {
-                    // Disable button and show processing state
-                    submitButton.disabled = true;
-                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...';
-                    
-                    // Re-enable button after a short delay to handle validation errors
-                    // This ensures the button becomes clickable again if there are errors
-                    setTimeout(function() {
-                        submitButton.disabled = false;
-                        submitButton.innerHTML = '<i class="bi bi-plus-circle"></i> Add Trainee';
-                    }, 3000);
-                });
-                
-                // If there are validation errors on page load, ensure button is enabled
-                const hasErrors = document.querySelector('.is-invalid');
-                if (hasErrors) {
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = '<i class="bi bi-plus-circle"></i> Add Trainee';
-                }
-            }
-        });
-    </script>
+    <script src="../assets/js/copy-credentials.js"></script>
 </body>
 </html>

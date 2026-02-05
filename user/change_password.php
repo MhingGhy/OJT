@@ -131,6 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $error = 'Please correct the errors below.';
     }
+    } // Close the CSRF else block
 }
 
 $page_title = $needs_email ? 'Complete Your Profile' : 'Change Password';

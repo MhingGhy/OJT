@@ -45,7 +45,11 @@ $page_title = 'View Trainee Profile';
     <link rel="stylesheet" href="../assets/css/style.css">
     <style>
         .profile-header {
-            background: linear-gradient(135deg, var(--navy-blue) 0%, var(--steel-blue) 100%);
+            background: linear-gradient(
+                135deg,
+                var(--primary-navy),
+                var(--secondary-steel)
+            );
             color: white;
             padding: 3rem 0;
             margin-bottom: 2rem;
@@ -58,6 +62,7 @@ $page_title = 'View Trainee Profile';
             object-fit: cover;
             border: 5px solid white;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transform: translateX(75px);
         }
         .profile-section {
             background: white;
@@ -176,10 +181,14 @@ $page_title = 'View Trainee Profile';
                         </div>
                         <div class="row mt-4">
                             <div class="col-12">
-                                <small>Profile Completion</small>
-                                <div class="progress" style="height: 25px;">
-                                    <div class="progress-bar bg-success" role="progressbar" style="width: <?php echo $completion; ?>%">
-                                        <?php echo $completion; ?>%
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <small>Profile Completion</small>
+                                        <div class="progress" style="width: 300px; height: 25px; margin-left: 15px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: <?php echo $completion; ?>%" aria-valuenow="<?php echo $completion; ?>" aria-valuemin="0" aria-valuemax="100">
+                                                <?php echo $completion; ?>%
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
