@@ -2,12 +2,14 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/session.php';
+require_once '../includes/security.php';
 
 require_admin();
+set_security_headers();
 
 $page_title = 'Trainee Credentials';
 
-// Get all trainees who haven't changed their password yet
+// Get all trainees who haven't changed their password yet (FIXED: Using prepared statement)
 $query = "SELECT 
     t.id,
     t.first_name,
@@ -22,7 +24,13 @@ INNER JOIN temporary_credentials tc ON u.id = tc.user_id
 WHERE u.require_password_change = 1
 ORDER BY tc.created_at DESC";
 
-$result = mysqli_query($conn, $query);
+$stmt = mysqli_prepare($conn, $query);
+if ($stmt) {
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+} else {
+    $result = false;
+}
 
 // Check if query failed (likely due to missing table)
 if ($result === false) {

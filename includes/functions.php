@@ -167,7 +167,10 @@ function get_status_badge($status) {
  */
 function count_total_trainees() {
     global $conn;
-    $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM trainees");
+    // FIXED: Using prepared statement
+    $stmt = mysqli_prepare($conn, "SELECT COUNT(*) as total FROM trainees");
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     $row = mysqli_fetch_assoc($result);
     return $row['total'];
 }
@@ -211,10 +214,37 @@ function get_recent_trainees($limit = 5) {
 
 /**
  * Generate random password
+ * Uses cryptographically secure random generation
+ * This is a wrapper for the secure version in security.php
  */
 function generate_password($length = 10) {
-    $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    return substr(str_shuffle($chars), 0, $length);
+    // Use the secure version from security.php if available
+    if (function_exists('generate_secure_password')) {
+        return generate_secure_password($length);
+    }
+    
+    // Fallback to secure generation if security.php not loaded
+    $lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $numbers = '0123456789';
+    $special = '!@#$%^&*()-_=+';
+    
+    $all_chars = $lowercase . $uppercase . $numbers . $special;
+    
+    // Ensure at least one character from each set
+    $password = '';
+    $password .= $lowercase[random_int(0, strlen($lowercase) - 1)];
+    $password .= $uppercase[random_int(0, strlen($uppercase) - 1)];
+    $password .= $numbers[random_int(0, strlen($numbers) - 1)];
+    $password .= $special[random_int(0, strlen($special) - 1)];
+    
+    // Fill the rest randomly
+    for ($i = 4; $i < $length; $i++) {
+        $password .= $all_chars[random_int(0, strlen($all_chars) - 1)];
+    }
+    
+    // Shuffle the password
+    return str_shuffle($password);
 }
 
 /**

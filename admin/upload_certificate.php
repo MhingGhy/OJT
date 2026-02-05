@@ -2,8 +2,10 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/session.php';
+require_once '../includes/security.php';
 
 require_admin();
+set_security_headers();
 
 // Get trainee ID
 if (!isset($_GET['trainee_id'])) {
@@ -33,49 +35,58 @@ $error = '';
 
 // Handle file upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $certificate_name = sanitize_input($_POST['certificate_name']);
-    $training_record_id = (int)$_POST['training_record_id'];
-    $description = sanitize_input($_POST['description']);
-    
-    if (empty($certificate_name)) {
-        $error = 'Please enter a certificate name.';
-    } elseif (!isset($_FILES['certificate_file']) || $_FILES['certificate_file']['error'] !== UPLOAD_ERR_OK) {
-        $error = 'Please select a file to upload.';
+    // Verify CSRF token
+    if (!verify_csrf_token()) {
+        $error = 'Security token validation failed. Please try again.';
+        log_security_event('CSRF_FAILURE', 'CSRF token validation failed on certificate upload', 'high');
     } else {
-        // Validate file
-        $file_errors = validate_file_upload($_FILES['certificate_file']);
+        $certificate_name = sanitize_input($_POST['certificate_name']);
+        $training_record_id = (int)$_POST['training_record_id'];
+        $description = sanitize_input($_POST['description']);
         
-        if (!empty($file_errors)) {
-            $error = implode('<br>', $file_errors);
+        if (empty($certificate_name)) {
+            $error = 'Please enter a certificate name.';
+        } elseif (!isset($_FILES['certificate_file']) || $_FILES['certificate_file']['error'] !== UPLOAD_ERR_OK) {
+            $error = 'Please select a file to upload.';
         } else {
-            // Generate unique filename
-            $original_name = $_FILES['certificate_file']['name'];
-            $unique_filename = generate_unique_filename($original_name);
-            $upload_path = UPLOAD_PATH . $unique_filename;
+            // Validate file
+            $file_errors = validate_file_upload($_FILES['certificate_file']);
             
-            // Create upload directory if it doesn't exist
-            if (!file_exists(UPLOAD_PATH)) {
-                mkdir(UPLOAD_PATH, 0777, true);
-            }
-            
-            // Move uploaded file
-            if (move_uploaded_file($_FILES['certificate_file']['tmp_name'], $upload_path)) {
-                // Insert certificate record
-                $file_type = get_file_extension($original_name);
-                $file_size = $_FILES['certificate_file']['size'];
-                $file_path = '../uploads/certificates/' . $unique_filename;
-                
-                $stmt = mysqli_prepare($conn, "INSERT INTO certificates (training_record_id, trainee_id, certificate_name, file_name, file_path, file_type, file_size, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                mysqli_stmt_bind_param($stmt, "iissssss", $training_record_id, $trainee_id, $certificate_name, $unique_filename, $file_path, $file_type, $file_size, $description);
-                
-                if (mysqli_stmt_execute($stmt)) {
-                    $success = 'Certificate uploaded successfully!';
-                } else {
-                    $error = 'Error saving certificate record.';
-                    unlink($upload_path); // Delete uploaded file
-                }
+            if (!empty($file_errors)) {
+                $error = implode('<br>', $file_errors);
             } else {
-                $error = 'Error uploading file. Please try again.';
+                // Generate unique filename
+                $original_name = $_FILES['certificate_file']['name'];
+                $unique_filename = generate_unique_filename($original_name);
+                $upload_path = UPLOAD_PATH . $unique_filename;
+                
+                // Create upload directory if it doesn't exist (SECURE PERMISSIONS)
+                if (!file_exists(UPLOAD_PATH)) {
+                    mkdir(UPLOAD_PATH, 0755, true); // FIXED: Changed from 0777 to 0755
+                }
+                
+                // Move uploaded file
+                if (move_uploaded_file($_FILES['certificate_file']['tmp_name'], $upload_path)) {
+                    // Insert certificate record
+                    $file_type = get_file_extension($original_name);
+                    $file_size = $_FILES['certificate_file']['size'];
+                    $file_path = '../uploads/certificates/' . $unique_filename;
+                    
+                    $stmt = mysqli_prepare($conn, "INSERT INTO certificates (training_record_id, trainee_id, certificate_name, file_name, file_path, file_type, file_size, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    mysqli_stmt_bind_param($stmt, "iissssss", $training_record_id, $trainee_id, $certificate_name, $unique_filename, $file_path, $file_type, $file_size, $description);
+                    
+                    if (mysqli_stmt_execute($stmt)) {
+                        $success = 'Certificate uploaded successfully!';
+                        log_security_event('CERTIFICATE_UPLOAD', "Certificate '{$certificate_name}' uploaded for trainee ID: {$trainee_id}", 'low');
+                    } else {
+                        $error = 'Error saving certificate record.';
+                        unlink($upload_path); // Delete uploaded file
+                        log_security_event('UPLOAD_ERROR', "Failed to save certificate record for trainee ID: {$trainee_id}", 'medium');
+                    }
+                } else {
+                    $error = 'Error uploading file. Please try again.';
+                    log_security_event('UPLOAD_ERROR', "Failed to move uploaded file for trainee ID: {$trainee_id}", 'medium');
+                }
             }
         }
     }
@@ -152,6 +163,7 @@ $page_title = 'Upload Certificate';
                 <div class="table-card">
                     <h5 class="fw-bold mb-3">Certificate Information</h5>
                     <form method="POST" action="" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <?php echo csrf_token_field(); ?>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="certificate_name" class="form-label">Certificate Name *</label>

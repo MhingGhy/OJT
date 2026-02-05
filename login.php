@@ -2,6 +2,10 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/session.php';
+require_once 'includes/security.php';
+
+// Set security headers
+set_security_headers();
 
 // Redirect if already logged in
 if (is_logged_in()) {
@@ -24,46 +28,76 @@ if (isset($_SESSION['registration_disabled_message'])) {
 
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = sanitize_input($_POST['username']);
-    $password = $_POST['password'];
-    
-    if (empty($username) || empty($password)) {
-        $error = 'Please enter both username and password.';
+    // Verify CSRF token
+    if (!verify_csrf_token()) {
+        $error = 'Security token validation failed. Please try again.';
+        log_security_event('CSRF_FAILURE', 'CSRF token validation failed on login', 'high');
     } else {
-        // Prepare statement to prevent SQL injection
-        $stmt = mysqli_prepare($conn, "SELECT * FROM users WHERE username = ?");
-        mysqli_stmt_bind_param($stmt, "s", $username);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
+        $username = sanitize_input($_POST['username']);
+        $password = $_POST['password'];
+        $client_ip = get_client_ip();
         
-        if ($user = mysqli_fetch_assoc($result)) {
-            // Verify password
-            if (verify_password($password, $user['password'])) {
-                // Update last login
-                $update_stmt = mysqli_prepare($conn, "UPDATE users SET last_login = NOW() WHERE id = ?");
-                mysqli_stmt_bind_param($update_stmt, "i", $user['id']);
-                mysqli_stmt_execute($update_stmt);
-                
-                // Set session
-                set_login_session($user);
-                
-                // Check if password change is required
-                if (isset($user['require_password_change']) && $user['require_password_change'] == 1) {
-                    $_SESSION['force_password_change'] = true;
-                    redirect('user/change_password.php');
-                }
-                
-                // Redirect based on role
-                if ($user['role'] === 'admin') {
-                    redirect('admin/index.php');
-                } else {
-                    redirect('user/index.php');
-                }
-            } else {
-                $error = 'Invalid username or password.';
-            }
+        if (empty($username) || empty($password)) {
+            $error = 'Please enter both username and password.';
         } else {
-            $error = 'Invalid username or password.';
+            // Check rate limiting
+            $rate_limit = check_rate_limit($username, $client_ip);
+            
+            if (!$rate_limit['allowed']) {
+                $error = 'Too many failed login attempts. Account temporarily locked. Please try again in ' . $rate_limit['wait_minutes'] . ' minutes.';
+                log_security_event('RATE_LIMIT_EXCEEDED', "Login attempts exceeded for username: $username from IP: $client_ip", 'high');
+            } else {
+                // Prepare statement to prevent SQL injection
+                $stmt = mysqli_prepare($conn, "SELECT * FROM users WHERE username = ?");
+                mysqli_stmt_bind_param($stmt, "s", $username);
+                mysqli_stmt_execute($stmt);
+                $result = mysqli_stmt_get_result($stmt);
+                
+                if ($user = mysqli_fetch_assoc($result)) {
+                    // Verify password
+                    if (verify_password($password, $user['password'])) {
+                        // Log successful login
+                        log_login_attempt($username, $client_ip, true);
+                        
+                        // Clear previous failed attempts
+                        clear_login_attempts($username);
+                        
+                        // Update last login
+                        $update_stmt = mysqli_prepare($conn, "UPDATE users SET last_login = NOW() WHERE id = ?");
+                        mysqli_stmt_bind_param($update_stmt, "i", $user['id']);
+                        mysqli_stmt_execute($update_stmt);
+                        
+                        // Set session
+                        set_login_session($user);
+                        
+                        // Log security event
+                        log_security_event('LOGIN_SUCCESS', "User {$username} logged in successfully", 'low');
+                        
+                        // Check if password change is required
+                        if (isset($user['require_password_change']) && $user['require_password_change'] == 1) {
+                            $_SESSION['force_password_change'] = true;
+                            redirect('user/change_password.php');
+                        }
+                        
+                        // Redirect based on role
+                        if ($user['role'] === 'admin') {
+                            redirect('admin/index.php');
+                        } else {
+                            redirect('user/index.php');
+                        }
+                    } else {
+                        // Log failed login attempt
+                        log_login_attempt($username, $client_ip, false);
+                        $error = 'Invalid username or password.';
+                        log_security_event('LOGIN_FAILURE', "Failed login attempt for username: $username from IP: $client_ip", 'medium');
+                    }
+                } else {
+                    // Log failed login attempt (username doesn't exist)
+                    log_login_attempt($username, $client_ip, false);
+                    $error = 'Invalid username or password.';
+                    log_security_event('LOGIN_FAILURE', "Failed login attempt for non-existent username: $username from IP: $client_ip", 'medium');
+                }
+            }
         }
     }
 }
@@ -122,6 +156,8 @@ if (isset($_GET['timeout'])) {
                         <?php endif; ?>
 
                         <form method="POST" action="" id="loginForm">
+                            <?php echo csrf_token_field(); ?>
+                            
                             <div class="mb-3">
                                 <label for="username" class="form-label">Username</label>
                                 <input type="text" class="form-control form-control-lg" id="username" name="username" required autofocus>
@@ -141,32 +177,7 @@ if (isset($_GET['timeout'])) {
                             <a href="index.php" class="text-decoration-none">
                                 <i class="bi bi-arrow-left"></i> Back to Home
                             </a>
-                            <?php if ($is_admin_login): ?>
-                                <span class="mx-2">|</span>
-                                <a href="login.php" class="text-decoration-none">Trainee Login</a>
-                            <?php else: ?>
-                                <span class="mx-2">|</span>
-                                <a href="login.php?admin=1" class="text-decoration-none">Admin Login</a>
-                            <?php endif; ?>
                         </div>
-
-                        <?php if (!$is_admin_login): ?>
-                            <div class="mt-4 p-3 bg-light rounded">
-                                <small class="text-muted">
-                                    <strong>Demo Credentials:</strong><br>
-                                    Username: juan.delacruz<br>
-                                    Password: password123
-                                </small>
-                            </div>
-                        <?php else: ?>
-                            <div class="mt-4 p-3 bg-light rounded">
-                                <small class="text-muted">
-                                    <strong>Admin Credentials:</strong><br>
-                                    Username: admin<br>
-                                    Password: admin123
-                                </small>
-                            </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>

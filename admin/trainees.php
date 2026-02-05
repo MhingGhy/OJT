@@ -2,16 +2,20 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/session.php';
+require_once '../includes/security.php';
 
 require_admin();
+set_security_headers();
 
 // Get all trainees with pagination
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $per_page = 10;
 $offset = ($page - 1) * $per_page;
 
-// Count total trainees
-$total_result = mysqli_query($conn, "SELECT COUNT(*) as total FROM trainees");
+// Count total trainees (FIXED: Using prepared statement)
+$count_stmt = mysqli_prepare($conn, "SELECT COUNT(*) as total FROM trainees");
+mysqli_stmt_execute($count_stmt);
+$total_result = mysqli_stmt_get_result($count_stmt);
 $total_row = mysqli_fetch_assoc($total_result);
 $total_trainees = $total_row['total'];
 $total_pages = ceil($total_trainees / $per_page);

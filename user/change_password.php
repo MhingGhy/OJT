@@ -2,8 +2,10 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/session.php';
+require_once '../includes/security.php';
 
 require_login();
+set_security_headers();
 
 $trainee_id = $_SESSION['trainee_id'];
 $user_id = $_SESSION['user_id'];
@@ -23,6 +25,11 @@ $needs_email = empty($trainee_data['email']);
 
 // Handle password change form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verify CSRF token
+    if (!verify_csrf_token()) {
+        $error = 'Security token validation failed. Please try again.';
+        log_security_event('CSRF_FAILURE', 'CSRF token validation failed on password change', 'high');
+    } else {
     $email = isset($_POST['email']) ? sanitize_input($_POST['email']) : '';
     $current_password = $_POST['current_password'] ?? '';
     $new_password = $_POST['new_password'] ?? '';
@@ -107,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_commit($conn);
                 
                 $success = $needs_email ? 'Email and password updated successfully!' : 'Password changed successfully!';
+                log_security_event('PASSWORD_CHANGE', "User {$_SESSION['username']} changed password", 'low');
                 
                 // Clear forced password change flag from session
                 if ($is_forced) {
@@ -117,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (Exception $e) {
                 mysqli_rollback($conn);
                 $error = 'Failed to update. Please try again.';
+                log_security_event('PASSWORD_CHANGE_ERROR', "Failed password change for user {$_SESSION['username']}: " . $e->getMessage(), 'medium');
             }
         }
     } else {
@@ -225,6 +234,7 @@ $page_title = $needs_email ? 'Complete Your Profile' : 'Change Password';
                                 <?php endif; ?>
                                 
                                 <form method="POST" action="">
+                                    <?php echo csrf_token_field(); ?>
                                     <?php if ($needs_email): ?>
                                         <div class="mb-3">
                                             <label for="email" class="form-label">Email Address *</label>

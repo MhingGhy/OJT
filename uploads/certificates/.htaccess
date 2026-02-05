@@ -1,0 +1,21 @@
+# Security configuration for uploads directory
+# Prevents script execution and unauthorized access
+
+# Prevent execution of PHP and other script files
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi|exe|bat)$">
+    Require all denied
+</FilesMatch>
+
+# Disable directory listing
+Options -Indexes
+
+# Force download for all files (prevent inline display)
+<FilesMatch ".*">
+    Header set Content-Disposition "attachment"
+    Header set X-Content-Type-Options "nosniff"
+</FilesMatch>
+
+# Only allow specific file types
+<FilesMatch "\.(pdf|jpg|jpeg|png)$">
+    Require all granted
+</FilesMatch>

@@ -6,9 +6,13 @@
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
+    // Enhanced session security configuration
     ini_set('session.cookie_httponly', 1);
     ini_set('session.use_only_cookies', 1);
-    ini_set('session.cookie_secure', 0); // Set to 1 if using HTTPS
+    ini_set('session.cookie_secure', 0); // Set to 1 when using HTTPS
+    ini_set('session.cookie_samesite', 'Strict'); // CSRF protection
+    ini_set('session.name', 'OJT_SESSION'); // Custom session name
+    ini_set('session.use_strict_mode', 1); // Prevent session fixation
     session_start();
 }
 

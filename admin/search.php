@@ -2,8 +2,10 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/session.php';
+require_once '../includes/security.php';
 
 require_admin();
+set_security_headers();
 
 $results = [];
 $search_performed = false;
@@ -68,12 +70,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['search']) || isset($_G
         mysqli_stmt_execute($stmt);
         $results = mysqli_stmt_get_result($stmt);
     } else {
-        $results = mysqli_query($conn, $query);
+        // Even without parameters, use prepared statement for consistency
+        $stmt = mysqli_prepare($conn, $query);
+        mysqli_stmt_execute($stmt);
+        $results = mysqli_stmt_get_result($stmt);
     }
 }
 
-// Get unique training types for filter
-$training_types_query = mysqli_query($conn, "SELECT DISTINCT training_type FROM training_records ORDER BY training_type");
+// Get unique training types for filter (FIXED: Using prepared statement)
+$training_types_stmt = mysqli_prepare($conn, "SELECT DISTINCT training_type FROM training_records ORDER BY training_type");
+mysqli_stmt_execute($training_types_stmt);
+$training_types_query = mysqli_stmt_get_result($training_types_stmt);
 
 $page_title = 'Search Trainees';
 ?>

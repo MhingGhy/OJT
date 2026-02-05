@@ -2,8 +2,10 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/session.php';
+require_once '../includes/security.php';
 
 require_admin();
+set_security_headers();
 
 $success = '';
 $error = '';
@@ -13,6 +15,11 @@ $generated_credentials = null; // Store generated credentials
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verify CSRF token
+    if (!verify_csrf_token()) {
+        $error = 'Security token validation failed. Please try again.';
+        log_security_event('CSRF_FAILURE', 'CSRF token validation failed on add trainee', 'high');
+    } else {
     // Capture all form data for repopulation
     $form_data = [
         'first_name' => sanitize_input($_POST['first_name'] ?? ''),
@@ -160,6 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
                 
                 $success = 'Trainee added successfully!';
+                log_security_event('TRAINEE_CREATED', "New trainee created: {$form_data['first_name']} {$form_data['last_name']} (ID: {$trainee_id})", 'low');
                 
                 // Clear form data after successful submission
                 $form_data = [];
@@ -167,11 +175,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (Exception $e) {
                 mysqli_rollback($conn);
                 $error = 'Error adding trainee: ' . $e->getMessage() . '. If this mentions "temporary_credentials", please run the database migration first.';
+                log_security_event('TRAINEE_CREATE_ERROR', "Failed to create trainee: " . $e->getMessage(), 'medium');
             }
-    } else {
-        $error = 'Please correct the errors below and try again.';
+        } else {
+            $error = 'Please correct the errors below and try again.';
+        }
     }
-}
 
 $page_title = 'Add New Trainee';
 ?>
@@ -277,6 +286,7 @@ $page_title = 'Add New Trainee';
                 <?php endif; ?>
 
                 <form method="POST" action="" id="addTraineeForm">
+                    <?php echo csrf_token_field(); ?>
                     <div class="row g-4">
                         <!-- Personal Information -->
                         <div class="col-12">
